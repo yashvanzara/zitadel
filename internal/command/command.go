@@ -18,7 +18,7 @@ import (
 
 	"github.com/zitadel/zitadel/internal/api/authz"
 	api_http "github.com/zitadel/zitadel/internal/api/http"
-	"github.com/zitadel/zitadel/internal/cache"
+	"github.com/zitadel/zitadel/internal/cache/connector"
 	"github.com/zitadel/zitadel/internal/command/preparation"
 	sd "github.com/zitadel/zitadel/internal/config/systemdefaults"
 	"github.com/zitadel/zitadel/internal/crypto"
@@ -54,6 +54,7 @@ type Commands struct {
 	smtpEncryption                  crypto.EncryptionAlgorithm
 	smsEncryption                   crypto.EncryptionAlgorithm
 	userEncryption                  crypto.EncryptionAlgorithm
+	targetEncryption                crypto.EncryptionAlgorithm
 	userPasswordHasher              *crypto.Hasher
 	secretHasher                    *crypto.Hasher
 	machineKeySize                  int
@@ -98,8 +99,9 @@ type Commands struct {
 }
 
 func StartCommands(
+	ctx context.Context,
 	es *eventstore.Eventstore,
-	cachesConfig *cache.CachesConfig,
+	cacheConnectors connector.Connectors,
 	defaults sd.SystemDefaults,
 	zitadelRoles []authz.RoleMapping,
 	staticStore static.Storage,
@@ -107,7 +109,7 @@ func StartCommands(
 	externalDomain string,
 	externalSecure bool,
 	externalPort uint16,
-	idpConfigEncryption, otpEncryption, smtpEncryption, smsEncryption, userEncryption, domainVerificationEncryption, oidcEncryption, samlEncryption crypto.EncryptionAlgorithm,
+	idpConfigEncryption, otpEncryption, smtpEncryption, smsEncryption, userEncryption, domainVerificationEncryption, oidcEncryption, samlEncryption, targetEncryption crypto.EncryptionAlgorithm,
 	httpClient *http.Client,
 	permissionCheck domain.PermissionCheck,
 	sessionTokenVerifier func(ctx context.Context, sessionToken string, sessionID string, tokenID string) (err error),
@@ -131,7 +133,7 @@ func StartCommands(
 	if err != nil {
 		return nil, fmt.Errorf("password hasher: %w", err)
 	}
-	caches, err := startCaches(context.TODO(), cachesConfig, es.Client())
+	caches, err := startCaches(ctx, cacheConnectors)
 	if err != nil {
 		return nil, fmt.Errorf("caches: %w", err)
 	}
@@ -152,6 +154,7 @@ func StartCommands(
 		smtpEncryption:                  smtpEncryption,
 		smsEncryption:                   smsEncryption,
 		userEncryption:                  userEncryption,
+		targetEncryption:                targetEncryption,
 		userPasswordHasher:              userPasswordHasher,
 		secretHasher:                    secretHasher,
 		machineKeySize:                  int(defaults.SecretGenerators.MachineKeySize),
